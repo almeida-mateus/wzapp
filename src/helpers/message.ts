@@ -142,7 +142,13 @@ export function getMessageType(m: WAMessage): MessageType {
   if (inner.locationMessage) return "location";
   if (inner.liveLocationMessage) return "live_location";
   if (inner.reactionMessage) return "reaction";
-  if (inner.pollCreationMessage || inner.pollCreationMessageV2 || inner.pollCreationMessageV3) {
+  if (
+    inner.pollCreationMessage ||
+    inner.pollCreationMessageV2 ||
+    inner.pollCreationMessageV3 ||
+    inner.pollCreationMessageV4 ||
+    inner.pollCreationMessageV5
+  ) {
     return "poll";
   }
   if (inner.pollUpdateMessage) return "poll_vote";
@@ -214,7 +220,9 @@ export function isPollMessage(m: WAMessage): boolean {
   return !!(
     m.message?.pollCreationMessage ||
     m.message?.pollCreationMessageV2 ||
-    m.message?.pollCreationMessageV3
+    m.message?.pollCreationMessageV3 ||
+    m.message?.pollCreationMessageV4 ||
+    m.message?.pollCreationMessageV5
   );
 }
 

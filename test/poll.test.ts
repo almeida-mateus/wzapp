@@ -143,4 +143,36 @@ describe("readPollVote", () => {
       readPollVote({ vote: pollVote(), creation, meId: ME }),
     ).toThrow(/messageSecret/);
   });
+
+  it("reads options from a V5 creation message", () => {
+    decryptPollVoteMock.mockReturnValue({ selectedOptions: [sha("sim")] });
+    const creation = pollCreation({
+      pollCreationMessageV3: undefined,
+      pollCreationMessageV5: {
+        name: "Pizza?",
+        options: [{ optionName: "sim" }, { optionName: "nao" }],
+      },
+    });
+
+    const out = readPollVote({ vote: pollVote(), creation, meId: ME });
+    expect(out.selectedOptions).toEqual(["sim"]);
+  });
+
+  it("unwraps a V4 envelope to reach the poll content", () => {
+    decryptPollVoteMock.mockReturnValue({ selectedOptions: [sha("nao")] });
+    const creation = pollCreation({
+      pollCreationMessageV3: undefined,
+      pollCreationMessageV4: {
+        message: {
+          pollCreationMessageV3: {
+            name: "Pizza?",
+            options: [{ optionName: "sim" }, { optionName: "nao" }],
+          },
+        },
+      },
+    });
+
+    const out = readPollVote({ vote: pollVote(), creation, meId: ME });
+    expect(out.selectedOptions).toEqual(["nao"]);
+  });
 });

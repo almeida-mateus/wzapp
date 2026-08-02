@@ -103,9 +103,9 @@ export type AnimatedStickerWAMessage = WAMessage & {
 };
 
 /**
- * Narrowed poll variant: one of the poll-creation shapes V1 through V3. Note
- * that Baileys 7 also ships `pollCreationMessageV4`/`V5`, which are not
- * recognized here (neither by this type nor by the runtime predicate).
+ * Narrowed poll variant: one of the poll-creation shapes V1 through V5.
+ * `V4` differs from the others: it is a `FutureProofMessage` envelope whose
+ * `message` field wraps the actual poll content.
  */
 export type PollWAMessage = WAMessage & {
   message: proto.IMessage &
@@ -113,6 +113,8 @@ export type PollWAMessage = WAMessage & {
       | { pollCreationMessage: NonNullable<proto.Message.IPollCreationMessage> }
       | { pollCreationMessageV2: NonNullable<proto.Message.IPollCreationMessage> }
       | { pollCreationMessageV3: NonNullable<proto.Message.IPollCreationMessage> }
+      | { pollCreationMessageV4: NonNullable<proto.Message.IFutureProofMessage> }
+      | { pollCreationMessageV5: NonNullable<proto.Message.IPollCreationMessage> }
     );
 };
 

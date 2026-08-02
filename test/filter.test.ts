@@ -133,6 +133,18 @@ describe("matchFilter", () => {
     });
   });
 
+  describe("message:poll shapes", () => {
+    it("matches every poll-creation shape, including V4/V5", () => {
+      const poll = matchFilter("message:poll");
+      expect(poll(mediaMessage({ pollCreationMessage: {} }))).toBe(true);
+      expect(poll(mediaMessage({ pollCreationMessageV2: {} }))).toBe(true);
+      expect(poll(mediaMessage({ pollCreationMessageV3: {} }))).toBe(true);
+      expect(poll(mediaMessage({ pollCreationMessageV4: { message: {} } }))).toBe(true);
+      expect(poll(mediaMessage({ pollCreationMessageV5: {} }))).toBe(true);
+      expect(poll(textMessage("hi"))).toBe(false);
+    });
+  });
+
   describe("media shortcut", () => {
     it("matches each media variant", () => {
       const media = matchFilter("media");

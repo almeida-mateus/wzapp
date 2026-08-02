@@ -22,13 +22,26 @@ export interface PollVote {
   selectedOptions: string[];
 }
 
-/** Poll-creation content across the shapes the filter DSL recognizes. */
+/**
+ * Poll-creation content across the shapes the filter DSL recognizes. `V4`
+ * is a `FutureProofMessage` envelope, so its inner message is checked for
+ * the same fields.
+ */
 function getPollCreationContent(m: WAMessage) {
   const inner = m.message;
-  return (
+  const direct =
     inner?.pollCreationMessage ??
     inner?.pollCreationMessageV2 ??
     inner?.pollCreationMessageV3 ??
+    inner?.pollCreationMessageV5;
+  if (direct) return direct;
+
+  const wrapped = inner?.pollCreationMessageV4?.message;
+  return (
+    wrapped?.pollCreationMessage ??
+    wrapped?.pollCreationMessageV2 ??
+    wrapped?.pollCreationMessageV3 ??
+    wrapped?.pollCreationMessageV5 ??
     undefined
   );
 }
