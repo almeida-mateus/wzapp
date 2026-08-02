@@ -376,6 +376,37 @@ await ctx.updateGroupDescription("New description");
 await ctx.leaveGroup();
 ```
 
+### Polls
+
+Sending and detecting polls works out of the box (`ctx.replyWithPoll`, `message:poll`, `message:poll:vote`). Reading votes takes one extra step: WhatsApp encrypts each vote with a key that only exists inside the poll creation message, so persist that message and hand it back when a vote arrives.
+
+For polls the bot creates, persist the return value of `ctx.replyWithPoll`:
+
+```ts
+bot.command("poll", async (ctx) => {
+  const poll = await ctx.replyWithPoll("Pizza?", ["yes", "no"]);
+  await db.set(poll.key.id!, JSON.stringify(poll));
+});
+```
+
+For polls created by others, store them from a `message:poll` handler, and decrypt votes as they arrive:
+
+```ts
+bot.on("message:poll", (ctx) => {
+  return db.set(ctx.messageId, JSON.stringify(ctx.update.message));
+});
+
+bot.on("message:poll:vote", async (ctx) => {
+  const creation = JSON.parse(await db.get(ctx.pollCreationKey.id));
+  const { voter, selectedOptions } = ctx.decryptPollVote(creation);
+  // selectedOptions: ["rock", "jazz"]
+});
+```
+
+Don't rely on `message:poll` to capture the bot's own polls: with the usual `.ignore("message:from_me")` setup, the creation echo is dropped before it reaches any handler. That is why the bot's own polls are persisted from the `replyWithPoll` return value.
+
+Each vote event carries the voter's entire current selection: voting again replaces it, and an empty `selectedOptions` means the vote was retracted. The standalone `readPollVote` function is exported for use outside a handler.
+
 ---
 
 ## The echo gotcha: `.ignore("message:from_me")`

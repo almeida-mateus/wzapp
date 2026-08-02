@@ -8,7 +8,7 @@
  * `yarn typecheck:test` exercises these assertions.
  */
 import { Bot, type Context } from "../src/index.js";
-import type { QuotedMessage } from "../src/index.js";
+import type { QuotedMessage, WAMessageKey } from "../src/index.js";
 
 const bot = new Bot({ authPath: "./auth" });
 
@@ -180,6 +180,20 @@ bot.on("message:image", (ctx) => {
   // @ts-expect-error  videoMessage isn't guaranteed inside a `message:image` handler
   const v: NonNullable<unknown> = ctx.update.message.message.videoMessage;
   void v;
+});
+
+// ─── Poll vote narrowing ────────────────────────────────────────────────────
+
+bot.on("message:poll:vote", (ctx) => {
+  // pollCreationKey is concrete inside a poll-vote handler:
+  const key: WAMessageKey = ctx.pollCreationKey;
+  void key;
+});
+
+bot.on("message:text", (ctx) => {
+  // @ts-expect-error  a text handler can't promise a poll creation key
+  const key: WAMessageKey = ctx.pollCreationKey;
+  void key;
 });
 
 // ─── Standalone Context still types getters as the wide union ──────────────

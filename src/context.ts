@@ -15,6 +15,7 @@ import {
   type QuotedMessage,
 } from "./helpers/message.js";
 import { isBroadcastJid, isGroupJid, isPrivateJid } from "./helpers/jid.js";
+import { readPollVote, type PollVote } from "./helpers/poll.js";
 import type { WhatsappUpdate } from "./update.js";
 import type {
   CaptionWAMessage,
@@ -24,6 +25,7 @@ import type {
   PrivateWAMessage,
   QuotedWAMessage,
   TextWAMessage,
+  WAMessageWith,
 } from "./filter.js";
 
 // ─── Narrowing helper types for Context getters ───────────────────────────
@@ -46,6 +48,12 @@ type IfPrivate<U, T, F> = U extends { type: "message"; message: PrivateWAMessage
   ? T
   : F;
 type IfGroup<U, T, F> = U extends { type: "message"; message: GroupWAMessage } ? T : F;
+type IfPollVote<U, T, F> = U extends {
+  type: "message";
+  message: WAMessageWith<"pollUpdateMessage">;
+}
+  ? T
+  : F;
 type IfBroadcast<U, T, F> = U extends {
   type: "message";
   message: BroadcastWAMessage;
@@ -278,6 +286,28 @@ export class Context<U extends WhatsappUpdate = WhatsappUpdate> {
       QuotedMessage,
       QuotedMessage | undefined
     >;
+  }
+
+  /**
+   * Key of the poll creation message this vote belongs to. Use it to look
+   * up the stored creation message and feed
+   * {@link Context.decryptPollVote}.
+   *
+   * `undefined` when the update is not a poll vote.
+   *
+   * @example
+   * bot.on("message:poll:vote", async (ctx) => {
+   *   const creation = await db.get(ctx.pollCreationKey.id);
+   *   // ...
+   * });
+   */
+  get pollCreationKey(): IfPollVote<U, WAMessageKey, WAMessageKey | undefined> {
+    const u = this.update;
+    if (u.type !== "message") {
+      return undefined as IfPollVote<U, WAMessageKey, WAMessageKey | undefined>;
+    }
+    return (u.message.message?.pollUpdateMessage?.pollCreationMessageKey ??
+      undefined) as IfPollVote<U, WAMessageKey, WAMessageKey | undefined>;
   }
 
   /**
@@ -577,6 +607,47 @@ export class Context<U extends WhatsappUpdate = WhatsappUpdate> {
   }
 
   // ───────────────────────── message actions ─────────────────────────
+
+  /**
+   * Decrypts the poll vote wrapped by this context and resolves the selected
+   * options to their names. Only meaningful inside a `message:poll:vote`
+   * handler.
+   *
+   * WhatsApp encrypts votes with the `messageSecret` stored inside the poll
+   * creation message, so the caller supplies that message: persist the
+   * return value of {@link Context.replyWithPoll} for polls the bot sends,
+   * or the message received in a `message:poll` handler for polls created
+   * by others. {@link Context.pollCreationKey} identifies which stored
+   * creation message a vote belongs to.
+   *
+   * @throws When the update is not a poll vote, or when `creation` is not a
+   * poll creation message carrying a `messageSecret`.
+   *
+   * Note that under `.ignore("message:from_me")` the bot's own poll
+   * creations never reach a `message:poll` handler (they come back as
+   * echoes and are dropped), which is why the bot's own polls are
+   * persisted from the `replyWithPoll` return value.
+   *
+   * @example
+   * bot.command("poll", async (ctx) => {
+   *   const poll = await ctx.replyWithPoll("Pizza?", ["yes", "no"]);
+   *   await db.set(poll.key.id, JSON.stringify(poll));
+   * });
+   *
+   * bot.on("message:poll", (ctx) => {  // polls created by others
+   *   return db.set(ctx.messageId, JSON.stringify(ctx.update.message));
+   * });
+   *
+   * bot.on("message:poll:vote", async (ctx) => {
+   *   const creation = JSON.parse(await db.get(ctx.pollCreationKey.id));
+   *   const { voter, selectedOptions } = ctx.decryptPollVote(creation);
+   *   // selectedOptions: ["rock", "jazz"]; empty when the vote was retracted
+   * });
+   */
+  decryptPollVote(creation: WAMessage): PollVote {
+    const msg = this.requireMessage("decryptPollVote");
+    return readPollVote({ vote: msg, creation, meId: this.me.id });
+  }
 
   /**
    * React to the current message with an emoji. Passing the empty string

@@ -16,6 +16,7 @@ export type {
   MediaInput,
   PresenceState,
   ReplyOpts,
+  WAMessageKey,
 } from "./context.js";
 
 export { Api } from "./api.js";
@@ -112,6 +113,9 @@ export {
   isVoiceMessage,
 } from "./helpers/message.js";
 export type { MessageType, QuotedMessage } from "./helpers/message.js";
+
+export { readPollVote } from "./helpers/poll.js";
+export type { PollVote } from "./helpers/poll.js";
 
 export {
   extractJid,
