@@ -646,7 +646,12 @@ export class Context<U extends WhatsappUpdate = WhatsappUpdate> {
    */
   decryptPollVote(creation: WAMessage): PollVote {
     const msg = this.requireMessage("decryptPollVote");
-    return readPollVote({ vote: msg, creation, meId: this.me.id });
+    return readPollVote({
+      vote: msg,
+      creation,
+      meId: this.me.id,
+      meLid: this.me.lid,
+    });
   }
 
   /**

@@ -158,6 +158,51 @@ describe("readPollVote", () => {
     expect(out.selectedOptions).toEqual(["sim"]);
   });
 
+  it("falls back to the participantAlt JID when the primary form fails to authenticate", () => {
+    const VOTER_LID = "111222333@lid";
+    decryptPollVoteMock.mockImplementation((_vote, opts) => {
+      if (opts.voterJid !== VOTER) {
+        throw new Error("Unsupported state or unable to authenticate data");
+      }
+      return { selectedOptions: [sha("sim")] };
+    });
+    const vote = pollVote();
+    vote.key.participant = VOTER_LID;
+    (vote.key as { participantAlt?: string }).participantAlt = VOTER;
+
+    const out = readPollVote({ vote, creation: pollCreation(), meId: ME });
+    expect(out).toEqual({ voter: VOTER, selectedOptions: ["sim"] });
+    expect(decryptPollVoteMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("tries the bot's lid for polls the bot created in lid-addressed chats", () => {
+    const ME_LID = "444555666@lid";
+    decryptPollVoteMock.mockImplementation((_vote, opts) => {
+      if (opts.pollCreatorJid !== ME_LID) {
+        throw new Error("Unsupported state or unable to authenticate data");
+      }
+      return { selectedOptions: [sha("nao")] };
+    });
+
+    const out = readPollVote({
+      vote: pollVote(),
+      creation: pollCreation(),
+      meId: ME,
+      meLid: ME_LID,
+    });
+    expect(out.selectedOptions).toEqual(["nao"]);
+  });
+
+  it("throws a diagnostic error when no JID combination authenticates", () => {
+    decryptPollVoteMock.mockImplementation(() => {
+      throw new Error("Unsupported state or unable to authenticate data");
+    });
+
+    expect(() =>
+      readPollVote({ vote: pollVote(), creation: pollCreation(), meId: ME }),
+    ).toThrow(/every known JID combination/);
+  });
+
   it("unwraps a V4 envelope to reach the poll content", () => {
     decryptPollVoteMock.mockReturnValue({ selectedOptions: [sha("nao")] });
     const creation = pollCreation({

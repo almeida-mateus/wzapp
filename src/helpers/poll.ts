@@ -1,17 +1,19 @@
 import { createHash } from "node:crypto";
 import {
   decryptPollVote,
-  getKeyAuthor,
   jidNormalizedUser,
 } from "@whiskeysockets/baileys";
-import type { WAMessage } from "@whiskeysockets/baileys";
+import type { WAMessage, WAMessageKey } from "@whiskeysockets/baileys";
 
 /**
  * A decrypted poll vote, with the option hashes already resolved back to
  * the option names from the creation message.
  */
 export interface PollVote {
-  /** JID of the voter. */
+  /**
+   * JID of the voter, in whichever form (`@s.whatsapp.net` or `@lid`)
+   * authenticated the decryption.
+   */
   voter: string;
   /**
    * The voter's full current selection. Every vote event carries the whole
@@ -47,6 +49,33 @@ function getPollCreationContent(m: WAMessage) {
 }
 
 /**
+ * JID forms that may identify the author of `key` in the vote's additional
+ * authenticated data. Phone-number and lid forms both occur in the wild
+ * (lid-addressed groups sign with `@lid` JIDs), so every known form is a
+ * candidate, most likely first.
+ */
+function authorCandidates(
+  key: (WAMessageKey & { participantAlt?: string }) | null | undefined,
+  self: string[],
+): string[] {
+  if (!key) return [];
+  if (key.fromMe) return self;
+  const out: string[] = [];
+  const forms = [
+    key.participant,
+    key.participantAlt,
+    key.remoteJid,
+    key.remoteJidAlt,
+  ];
+  for (const form of forms) {
+    if (!form) continue;
+    const jid = jidNormalizedUser(form);
+    if (jid && !out.includes(jid)) out.push(jid);
+  }
+  return out;
+}
+
+/**
  * Decrypts a poll vote (`pollUpdateMessage`) and maps the selected-option
  * hashes back to option names.
  *
@@ -56,11 +85,20 @@ function getPollCreationContent(m: WAMessage) {
  * it for polls the bot sends, and `message:poll` handlers receive it for
  * polls created by others.
  *
+ * The vote's authenticated data binds the creator and voter JIDs, and
+ * lid-addressed chats sign with `@lid` forms while others use phone-number
+ * forms. Decryption therefore tries every known form of both JIDs until one
+ * combination authenticates; wrong combinations fail cleanly, so this cannot
+ * mis-decrypt.
+ *
  * Inside a `message:poll:vote` handler, prefer the
- * {@link Context.decryptPollVote} wrapper, which fills in `vote` and `meId`.
+ * {@link Context.decryptPollVote} wrapper, which fills in `vote`, `meId`,
+ * and `meLid`.
  *
  * @throws When `vote` carries no `pollUpdateMessage`, when `creation` is not
- * a poll creation message, or when `creation` lacks the `messageSecret`.
+ * a poll creation message, when `creation` lacks the `messageSecret`, or
+ * when no JID combination authenticates (usually a creation message that
+ * does not match this vote).
  */
 export function readPollVote(args: {
   /** The message carrying the vote (`pollUpdateMessage`). */
@@ -69,8 +107,10 @@ export function readPollVote(args: {
   creation: WAMessage;
   /** The bot's own JID, used to resolve `fromMe` keys to an author. */
   meId: string;
+  /** The bot's lid JID, tried as an alternative form for `fromMe` keys. */
+  meLid?: string;
 }): PollVote {
-  const { vote, creation, meId } = args;
+  const { vote, creation, meId, meLid } = args;
 
   const upd = vote.message?.pollUpdateMessage;
   if (!upd?.vote) {
@@ -93,14 +133,41 @@ export function readPollVote(args: {
     throw new Error("readPollVote: poll creation key has no message id");
   }
 
-  const me = jidNormalizedUser(meId);
-  const voter = getKeyAuthor(vote.key, me);
-  const decrypted = decryptPollVote(upd.vote, {
-    pollCreatorJid: getKeyAuthor(creationKey, me),
-    pollMsgId: creationKey.id,
-    pollEncKey,
-    voterJid: voter,
-  });
+  const self = [meId, meLid]
+    .filter((j): j is string => !!j)
+    .map((j) => jidNormalizedUser(j))
+    .filter((j, i, all) => !!j && all.indexOf(j) === i);
+  const creators = authorCandidates(creationKey, self);
+  const voters = authorCandidates(vote.key, self);
+
+  let decrypted: ReturnType<typeof decryptPollVote> | undefined;
+  let voter: string | undefined;
+  let lastError: unknown;
+  for (const creator of creators) {
+    for (const candidate of voters) {
+      try {
+        decrypted = decryptPollVote(upd.vote, {
+          pollCreatorJid: creator,
+          pollMsgId: creationKey.id,
+          pollEncKey,
+          voterJid: candidate,
+        });
+        voter = candidate;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    if (decrypted) break;
+  }
+  if (!decrypted || voter === undefined) {
+    throw new Error(
+      "readPollVote: vote decryption failed for every known JID combination. " +
+        "The supplied creation message probably does not match this vote " +
+        "(verify its messageSecret and message id).",
+      { cause: lastError },
+    );
+  }
 
   const nameByHash = new Map<string, string>();
   for (const option of content.options ?? []) {
