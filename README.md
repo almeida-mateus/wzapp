@@ -112,10 +112,29 @@ new Bot({ authPath: "./auth" });
 ```
 This uses Baileys' `useMultiFileAuthState` under the hood.
 
-**Custom auth handle** (production: SQLite, Redis, S3):
+**Storage-backed** (production: Redis, S3, SQL, anywhere without a writable disk):
+```ts
+import { Bot, storageAuthState, type AuthStorage } from "@almeidamateus/wzapp";
+import { createClient } from "redis";
+
+const redis = createClient({ url: process.env.REDIS_URL });
+await redis.connect();
+
+const storage: AuthStorage = {
+  get: (key) => redis.get(`wa:${key}`),
+  set: async (key, value) => { await redis.set(`wa:${key}`, value); },
+  delete: async (key) => { await redis.del(`wa:${key}`); },
+  getMany: (keys) => redis.mGet(keys.map((k) => `wa:${k}`)),
+};
+
+const bot = new Bot({ auth: await storageAuthState(storage) });
+```
+
+`AuthStorage` is three methods (`get`, `set`, `delete` over strings) plus optional batch fast paths (`getMany`, `setMany`), so any backend becomes an adapter in a dozen lines. Sessions survive redeploys and ephemeral filesystems; no volume, no re-pairing. The signal key store is wrapped in Baileys' in-memory cache by default, so the backend only sees a fraction of the reads.
+
+**Custom auth handle** (full control):
 ```ts
 import { Bot, type AuthHandle } from "@almeidamateus/wzapp";
-import { myCustomAuth } from "./auth-store.js";
 
 const auth: AuthHandle = await myCustomAuth();
 new Bot({ auth });

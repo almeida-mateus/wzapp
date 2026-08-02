@@ -4,7 +4,7 @@ import { Context } from "../src/context.js";
 import type { WhatsappUpdate } from "../src/update.js";
 
 /* ─── Context fakes ────────────────────────────────────────────────────
- * The composer never touches the socket or api — it only reads `ctx.update`
+ * The composer never touches the socket or api. It only reads `ctx.update`
  * (and, for `command`, `ctx.prefix`) and stashes match results. We can
  * therefore drive it with a minimal stub.
  */
@@ -285,7 +285,7 @@ describe("`next` invariant", () => {
       await next();
     });
     // A downstream middleware is required for the `concat`-guarded `next`
-    // to actually wrap the inner call — without it, the second `await next()`
+    // to actually wrap the inner call. Without it, the second `await next()`
     // resolves to the raw dispatcher and slips by.
     c.use(async () => undefined);
     await expect(

@@ -20,6 +20,9 @@ export type {
 
 export { Api } from "./api.js";
 
+export { memoryAuthStorage, storageAuthState } from "./auth.js";
+export type { AuthStorage, StorageAuthOptions } from "./auth.js";
+
 export { Runner } from "./runner.js";
 export type { RunnerOptions } from "./runner.js";
 
