@@ -1,0 +1,68 @@
+{
+  "name": "@almeidamateus/wzapp",
+  "version": "0.1.1",
+  "description": "grammY-style framework for WhatsApp bots, built on Baileys.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "/dist",
+    "/src"
+  ],
+  "workspaces": [
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepack": "tsup",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot",
+    "framework",
+    "grammy",
+    "middleware"
+  ],
+  "author": "Mateus Almeida",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/almeida-mateus/wzapp.git"
+  },
+  "homepage": "https://github.com/almeida-mateus/wzapp#readme",
+  "bugs": {
+    "url": "https://github.com/almeida-mateus/wzapp/issues"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "7.0.0-rc12",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "yarn@4.18.0"
+}

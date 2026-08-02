@@ -1,0 +1,28 @@
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+
+# Baileys auth folders
+auth/
+auth_*/
+**/auth/
+**/auth_*/
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.tsbuildinfo
+coverage/
+projects/
+# Yarn Berry
+.yarn/cache/
+.yarn/install-state.gz
