@@ -106,13 +106,13 @@ The first connection (no credentials) goes through `connect`, `QR`, `scan`, `clo
 
 Two options:
 
-**Local file** (default, good for development):
+**Local file** (default):
 ```ts
 new Bot({ authPath: "./auth" });
 ```
 This uses Baileys' `useMultiFileAuthState` under the hood.
 
-**Storage-backed** (production: Redis, S3, SQL, anywhere without a writable disk):
+**Storage-backed** (Redis, S3, SQL, any string key-value backend):
 ```ts
 import { Bot, storageAuthState, type AuthStorage } from "@almeidamateus/wzapp";
 import { createClient } from "redis";
@@ -130,9 +130,9 @@ const storage: AuthStorage = {
 const bot = new Bot({ auth: await storageAuthState(storage) });
 ```
 
-`AuthStorage` is three methods (`get`, `set`, `delete` over strings) plus optional batch fast paths (`getMany`, `setMany`), so any backend becomes an adapter in a dozen lines. Sessions survive redeploys and ephemeral filesystems; no volume, no re-pairing. The signal key store is wrapped in Baileys' in-memory cache by default, so the backend only sees a fraction of the reads.
+`AuthStorage` is three methods (`get`, `set`, `delete` over strings) plus optional batch fast paths (`getMany`, `setMany`), so any backend becomes an adapter in a dozen lines. The session lives entirely in the backend and no files are written. The signal key store is wrapped in Baileys' in-memory cache by default, so the backend only sees a fraction of the reads.
 
-**Custom auth handle** (full control):
+**Custom auth handle**:
 ```ts
 import { Bot, type AuthHandle } from "@almeidamateus/wzapp";
 
