@@ -405,7 +405,9 @@ bot.on("message:poll:vote", async (ctx) => {
 
 Don't rely on `message:poll` to capture the bot's own polls: with the usual `.ignore("message:from_me")` setup, the creation echo is dropped before it reaches any handler. That is why the bot's own polls are persisted from the `replyWithPoll` return value.
 
-Each vote event carries the voter's entire current selection: voting again replaces it, and an empty `selectedOptions` means the vote was retracted. The standalone `readPollVote` function is exported for use outside a handler.
+Store the creation message in whatever backend you already have: a plain `JSON.stringify` round-trip is enough, binary fields included.
+
+Each vote event carries the voter's entire current selection: voting again replaces it, and an empty `selectedOptions` means the vote was retracted. `decryptPollVote` throws when a vote cannot be authenticated (a mismatched or missing creation message, for example), so guard the call with a try/catch or an `errorBoundary` if one bad vote must not break the handler chain. The standalone `readPollVote` function is exported for use outside a handler.
 
 ---
 

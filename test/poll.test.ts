@@ -20,6 +20,7 @@ const ME = "5599888877776@s.whatsapp.net";
 const VOTER = "5511999998888@s.whatsapp.net";
 
 const sha = (s: string) => createHash("sha256").update(s).digest();
+const SECRET = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 
 function pollCreation(overrides?: Partial<WAMessage["message"]>): WAMessage {
   return {
@@ -29,7 +30,7 @@ function pollCreation(overrides?: Partial<WAMessage["message"]>): WAMessage {
         name: "Pizza?",
         options: [{ optionName: "sim" }, { optionName: "nao" }],
       },
-      messageContextInfo: { messageSecret: new Uint8Array([1, 2, 3]) },
+      messageContextInfo: { messageSecret: SECRET },
       ...overrides,
     },
   } as WAMessage;
@@ -142,6 +143,56 @@ describe("readPollVote", () => {
     expect(() =>
       readPollVote({ vote: pollVote(), creation, meId: ME }),
     ).toThrow(/messageSecret/);
+  });
+
+  it("decodes a base64 messageSecret left by a JSON round-trip", () => {
+    decryptPollVoteMock.mockReturnValue({ selectedOptions: [sha("sim")] });
+    const creation = pollCreation({
+      messageContextInfo: {
+        messageSecret: Buffer.from(SECRET).toString(
+          "base64",
+        ) as unknown as Uint8Array,
+      },
+    });
+
+    const out = readPollVote({ vote: pollVote(), creation, meId: ME });
+
+    expect(out.selectedOptions).toEqual(["sim"]);
+    expect(decryptPollVoteMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ pollEncKey: SECRET }),
+    );
+  });
+
+  it("rebuilds a messageSecret serialized as a numeric-key object", () => {
+    decryptPollVoteMock.mockReturnValue({ selectedOptions: [sha("nao")] });
+    const creation = pollCreation({
+      messageContextInfo: {
+        messageSecret: JSON.parse(
+          JSON.stringify(SECRET),
+        ) as unknown as Uint8Array,
+      },
+    });
+
+    const out = readPollVote({ vote: pollVote(), creation, meId: ME });
+
+    expect(out.selectedOptions).toEqual(["nao"]);
+    expect(decryptPollVoteMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ pollEncKey: SECRET }),
+    );
+  });
+
+  it("throws a corruption diagnostic when the secret is not 32 bytes", () => {
+    const creation = pollCreation({
+      messageContextInfo: {
+        messageSecret: "abcd" as unknown as Uint8Array,
+      },
+    });
+
+    expect(() =>
+      readPollVote({ vote: pollVote(), creation, meId: ME }),
+    ).toThrow(/expected 32/);
   });
 
   it("reads options from a V5 creation message", () => {

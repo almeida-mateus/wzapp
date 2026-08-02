@@ -25,6 +25,29 @@ export interface PollVote {
 }
 
 /**
+ * Coerces a stored `messageSecret` back to raw bytes. Protobuf message
+ * instances base64-encode `bytes` fields in `toJSON()`, so a creation
+ * message that went through `JSON.stringify`/`JSON.parse` (the documented
+ * persistence pattern) carries the secret as a base64 string; a plain
+ * `Uint8Array` serialized naively becomes a `{ "0": n, ... }` object.
+ * All three forms are accepted.
+ */
+function secretToBytes(secret: unknown): Uint8Array | undefined {
+  if (secret instanceof Uint8Array) return secret;
+  if (typeof secret === "string" && secret.length > 0) {
+    return Uint8Array.from(Buffer.from(secret, "base64"));
+  }
+  if (Array.isArray(secret)) return Uint8Array.from(secret);
+  if (secret && typeof secret === "object") {
+    const values = Object.values(secret as Record<string, unknown>);
+    if (values.length > 0 && values.every((v) => typeof v === "number")) {
+      return Uint8Array.from(values as number[]);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Poll-creation content across the shapes the filter DSL recognizes. `V4`
  * is a `FutureProofMessage` envelope, so its inner message is checked for
  * the same fields.
@@ -122,10 +145,18 @@ export function readPollVote(args: {
       "readPollVote: `creation` is not a poll creation message",
     );
   }
-  const pollEncKey = creation.message?.messageContextInfo?.messageSecret;
+  const pollEncKey = secretToBytes(
+    creation.message?.messageContextInfo?.messageSecret,
+  );
   if (!pollEncKey) {
     throw new Error(
       "readPollVote: `creation` has no messageSecret, so its votes cannot be decrypted",
+    );
+  }
+  if (pollEncKey.length !== 32) {
+    throw new Error(
+      `readPollVote: messageSecret decoded to ${pollEncKey.length} bytes, expected 32. ` +
+        "The stored creation message is corrupted (was the secret re-encoded during persistence?)",
     );
   }
   const creationKey = upd.pollCreationMessageKey ?? creation.key;
